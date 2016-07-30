@@ -66,6 +66,10 @@ bool Adafruit_BMP085_Unified::writeCommand(byte reg, byte value)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::read8(byte reg, uint8_t *value)
 {
+  const byte bytesToRead = 1;
+  #if ARDUINO >= 10607
+  if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
+  #else
   _wire->beginTransmission((uint8_t)BMP085_ADDRESS);
   #if ARDUINO >= 100
     _wire->write((uint8_t)reg);
@@ -77,9 +81,8 @@ bool Adafruit_BMP085_Unified::read8(byte reg, uint8_t *value)
     // Error.
     return false;
   }
-
-  const byte bytesToRead = 1;
-  if (!_wire->requestFrom((uint8_t)BMP085_ADDRESS, (byte)bytesToRead) == bytesToRead)
+  if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, (byte)bytesToRead) != bytesToRead)
+  #endif
   {
     return false;
   }
@@ -98,6 +101,10 @@ bool Adafruit_BMP085_Unified::read8(byte reg, uint8_t *value)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::read16(byte reg, uint16_t *value)
 {
+  const byte bytesToRead = 2;
+  #if ARDUINO >= 10607
+  if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
+  #else
   _wire->beginTransmission((uint8_t)BMP085_ADDRESS);
   #if ARDUINO >= 100
     _wire->write((uint8_t)reg);
@@ -109,9 +116,8 @@ bool Adafruit_BMP085_Unified::read16(byte reg, uint16_t *value)
     // Error.
     return false;
   }
-
-  const byte bytesToRead = 2;
-  if (!_wire->requestFrom((uint8_t)BMP085_ADDRESS, (byte)bytesToRead) == bytesToRead)
+  if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead) != bytesToRead)
+  #endif
   {
     return false;
   }
@@ -136,6 +142,7 @@ bool Adafruit_BMP085_Unified::readS16(byte reg, int16_t *value)
     return false;
   }
   *value = (int16_t)i;
+  return true;
 }
 
 /**************************************************************************/
@@ -407,6 +414,7 @@ bool Adafruit_BMP085_Unified::getTemperature(float *temp)
   t /= 10;
 
   *temp = t;
+  return true;
 }
 
 /**************************************************************************/
