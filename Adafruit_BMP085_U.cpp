@@ -182,6 +182,114 @@ bool Adafruit_BMP085_Unified::readCoefficients(void)
   #endif
 }
 
+int8_t Adafruit_BMP085_Unified::isDataReady()
+{
+  if (readingTemperature)
+  {
+    if (micros() - readyStart > readyDelay)
+    {
+      // Temperature is ready
+      if (!readTemperature(&lastTemperature))
+      {
+        return -1;
+      }
+      // Kick off the pressure reading
+      if (!requestPressure())
+      {
+        return -2;
+      }
+      return DATA_READY_TEMPERATURE;
+    }
+  }
+  else if (readingPressure)
+  {
+    if (micros() - readyStart > readyDelay)
+    {
+      // Pressure is ready
+      if (!readPressure(&lastPressure))
+      {
+        return -3;
+      }
+      // Kick off the temperature reading
+      if (!requestTemperature())
+      {
+        return -4;
+      }
+      return DATA_READY_PRESSURE;
+    }
+  }
+  else
+  {
+    // We haven't started anything, so initialize
+    if (!requestTemperature())
+    {
+      return -4;
+    }
+  }
+  // Nothing is ready
+  return 0;
+}
+
+bool Adafruit_BMP085_Unified::requestTemperature()
+{
+  bool result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READTEMPCMD);
+  readingTemperature = true;
+  readyStart = micros();
+  readyDelay = TEMPERATURE_READ_DELAY_MICROS;
+  return result;
+}
+
+bool Adafruit_BMP085_Unified::requestPressure()
+{
+  bool result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READPRESSURECMD + (_bmp085Mode << 6));
+  readingPressure = true;
+  readyStart = micros();
+  switch(_bmp085Mode)
+  {
+    case BMP085_MODE_ULTRALOWPOWER:
+      readyDelay = PRESSURE_ULTRALOW_READ_DELAY_MICROS;
+      break;
+    case BMP085_MODE_STANDARD:
+      readyDelay = PRESSURE_STANDARD_READ_DELAY_MICROS;
+      break;
+    case BMP085_MODE_HIGHRES:
+      readyDelay = PRESSURE_HIGH_READ_DELAY_MICROS;
+      break;
+    case BMP085_MODE_ULTRAHIGHRES:
+    default:
+      readyDelay = PRESSURE_ULTRAHIGH_READ_DELAY_MICROS;
+      break;
+  }
+
+  return result;
+}
+
+bool Adafruit_BMP085_Unified::readTemperature(uint16_t *temperature)
+{
+  bool result = read16(BMP085_REGISTER_TEMPDATA, temperature);
+  readingTemperature = false;
+  readyTemperature = true;
+  return result;
+}
+
+bool Adafruit_BMP085_Unified::readPressure(int32_t *pressure)
+{
+  uint16_t p16;
+  uint8_t p8;
+  if (!read16(BMP085_REGISTER_PRESSUREDATA, &p16))
+  {
+    return false;
+  }
+  if (!read8(BMP085_REGISTER_PRESSUREDATA+2, &p8))
+  {
+    return false;
+  }
+  *pressure = ((uint32_t)p16 << 8 | p8) >> (8 - _bmp085Mode);
+  readingPressure = false;
+  readyPressure = true;
+  return true;
+}
+
 /**************************************************************************/
 /*!
 
@@ -193,12 +301,12 @@ bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
     *temperature = 27898;
   #else
     uint16_t t;
-    if (!writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READTEMPCMD))
+    if (!requestTemperature())
     {
       return false;
     }
-    delay(5);
-    if (!read16(BMP085_REGISTER_TEMPDATA, &t))
+    delayMicroseconds(readyDelay);
+    if (!readTemperature(&t))
     {
       return false;
     }
@@ -217,44 +325,19 @@ bool Adafruit_BMP085_Unified::readRawPressure(int32_t *pressure)
   #if BMP085_USE_DATASHEET_VALS
     *pressure = 23843;
   #else
-    uint8_t  p8;
-    uint16_t p16;
-    int32_t  p32;
 
-    if (!writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READPRESSURECMD + (_bmp085Mode << 6)))
+    if (!requestPressure())
     {
       return false;
     }
-    switch(_bmp085Mode)
-    {
-      case BMP085_MODE_ULTRALOWPOWER:
-        delay(5);
-        break;
-      case BMP085_MODE_STANDARD:
-        delay(8);
-        break;
-      case BMP085_MODE_HIGHRES:
-        delay(14);
-        break;
-      case BMP085_MODE_ULTRAHIGHRES:
-      default:
-        delay(26);
-        break;
-    }
-
-    if (!read16(BMP085_REGISTER_PRESSUREDATA, &p16))
+    // We can't simply use delayMicroseconds because it won't pause for longer
+    // than 16383us, which is less than the duration required for ULTRAHIGHRES.
+    delay(readyDelay / 1000);
+    delayMicroseconds(readyDelay % 1000);
+    if (!readPressure(pressure))
     {
       return false;
     }
-    p32 = (uint32_t)p16 << 8;
-    if (!read8(BMP085_REGISTER_PRESSUREDATA+2, &p8))
-    {
-      return false;
-    }
-    p32 += p8;
-    p32 >>= (8 - _bmp085Mode);
-    
-    *pressure = p32;
   #endif
   return true;
 }
@@ -269,7 +352,6 @@ int32_t Adafruit_BMP085_Unified::computeB5(int32_t ut) {
   int32_t X2 = ((int32_t)_bmp085_coeffs.mc << 11) / (X1+(int32_t)_bmp085_coeffs.md);
   return X1 + X2;
 }
-
 
 /***************************************************************************
  CONSTRUCTOR
@@ -340,10 +422,20 @@ bool Adafruit_BMP085_Unified::getPressure(float *pressure)
   int32_t  ut = 0, up = 0;
 
   /* Get the raw pressure and temperature values */
-  if (!(readRawTemperature(&ut) && readRawPressure(&up)))
+  if (readyPressure)
   {
-    return false;
+    ut = lastTemperature;
+    up = lastPressure;
   }
+  else
+  {
+    if (!(readRawTemperature(&ut) && readRawPressure(&up)))
+    {
+      return false;
+    }
+    readyTemperature = false;
+  }
+  readyPressure = false;
 
   int32_t compp = 0;
   int32_t  x1, x2, b5, b6, x3, b3, p;
@@ -392,10 +484,19 @@ bool Adafruit_BMP085_Unified::getPressure(float *pressure)
 bool Adafruit_BMP085_Unified::getTemperature(float *temp)
 {
   int32_t UT;
-  if (!readRawTemperature(&UT))
+
+  if (readyTemperature)
   {
-    return false;
+    UT = lastTemperature;
   }
+  else
+  {
+    if (!readRawTemperature(&UT))
+    {
+      return false;
+    }
+  }
+  readyTemperature = false;
 
   int32_t B5;
   float t;
