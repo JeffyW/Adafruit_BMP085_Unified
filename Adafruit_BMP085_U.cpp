@@ -14,28 +14,14 @@
   Written by Kevin Townsend for Adafruit Industries.
   BSD license, all text above must be included in any redistribution
  ***************************************************************************/
-#if ARDUINO >= 100
 #include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
-#ifdef __AVR_ATtiny85__
-#include "TinyWireM.h"
-#define Wire TinyWireM
-#else
 #include <Wire.h>
-#endif
-
 #include <math.h>
 #include <limits.h>
-
 #include "Adafruit_BMP085_U.h"
 
 static bmp085_calib_data _bmp085_coeffs;   // Last read accelerometer data will be available here
 static uint8_t           _bmp085Mode;
-
-#define BMP085_USE_DATASHEET_VALS (0) /* Set to 1 for sanity check */
 
 /***************************************************************************
  PRIVATE FUNCTIONS
@@ -46,16 +32,11 @@ static uint8_t           _bmp085Mode;
 	 @brief  Writes an 8 bit value over I2C
  */
  /**************************************************************************/
-bool Adafruit_BMP085_Unified::writeCommand(byte reg, byte value)
+bool Adafruit_BMP085_Unified::writeCommand(uint8_t reg, uint8_t value)
 {
-	_wire->beginTransmission((uint8_t)BMP085_ADDRESS);
-#if ARDUINO >= 100
-	_wire->write((uint8_t)reg);
-	_wire->write((uint8_t)value);
-#else
-	_wire->send(reg);
-	_wire->send(value);
-#endif
+	_wire->beginTransmission(BMP085_ADDRESS);
+	_wire->write(reg);
+	_wire->write(value);
 	return _wire->endTransmission() == 0;
 }
 
@@ -64,33 +45,14 @@ bool Adafruit_BMP085_Unified::writeCommand(byte reg, byte value)
 	@brief  Reads an 8 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::read8(byte reg, uint8_t *value)
+bool Adafruit_BMP085_Unified::read8(uint8_t reg, uint8_t *value)
 {
 	const byte bytesToRead = 1;
-#if ARDUINO >= 10607
-	if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
-#else
-	_wire->beginTransmission((uint8_t)BMP085_ADDRESS);
-#if ARDUINO >= 100
-	_wire->write((uint8_t)reg);
-#else
-	_wire->send(reg);
-#endif
-	if (_wire->endTransmission() != 0)
-	{
-		// Error.
-		return false;
-	}
-	if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, (byte)bytesToRead) != bytesToRead)
-#endif
+	if (_wire->requestFrom(BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
 	{
 		return false;
 	}
-#if ARDUINO >= 100
 	* value = _wire->read();
-#else
-	*value = _wire->receive();
-#endif  
 	return true;
 }
 
@@ -99,33 +61,14 @@ bool Adafruit_BMP085_Unified::read8(byte reg, uint8_t *value)
 	@brief  Reads a 16 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::read16(byte reg, uint16_t *value)
+bool Adafruit_BMP085_Unified::read16(uint8_t reg, uint16_t *value)
 {
 	const byte bytesToRead = 2;
-#if ARDUINO >= 10607
-	if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
-#else
-	_wire->beginTransmission((uint8_t)BMP085_ADDRESS);
-#if ARDUINO >= 100
-	_wire->write((uint8_t)reg);
-#else
-	_wire->send(reg);
-#endif
-	if (_wire->endTransmission() != 0)
-	{
-		// Error.
-		return false;
-	}
-	if (_wire->requestFrom((uint8_t)BMP085_ADDRESS, bytesToRead) != bytesToRead)
-#endif
+	if (_wire->requestFrom(BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
 	{
 		return false;
 	}
-#if ARDUINO >= 100
 	* value = (_wire->read() << 8) | _wire->read();
-#else
-	*value = (_wire->receive() << 8) | _wire->receive();
-#endif  
 	return true;
 }
 
@@ -134,7 +77,7 @@ bool Adafruit_BMP085_Unified::read16(byte reg, uint16_t *value)
 	@brief  Reads a signed 16 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::readS16(byte reg, int16_t *value)
+bool Adafruit_BMP085_Unified::readS16(uint8_t reg, int16_t *value)
 {
 	uint16_t i;
 	if (!read16(reg, &i))
@@ -152,21 +95,6 @@ bool Adafruit_BMP085_Unified::readS16(byte reg, int16_t *value)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::readCoefficients(void)
 {
-#if BMP085_USE_DATASHEET_VALS
-	_bmp085_coeffs.ac1 = 408;
-	_bmp085_coeffs.ac2 = -72;
-	_bmp085_coeffs.ac3 = -14383;
-	_bmp085_coeffs.ac4 = 32741;
-	_bmp085_coeffs.ac5 = 32757;
-	_bmp085_coeffs.ac6 = 23153;
-	_bmp085_coeffs.b1 = 6190;
-	_bmp085_coeffs.b2 = 4;
-	_bmp085_coeffs.mb = -32768;
-	_bmp085_coeffs.mc = -8711;
-	_bmp085_coeffs.md = 2868;
-	_bmp085Mode = 0;
-	return true;
-#else
 	return
 		readS16(BMP085_REGISTER_CAL_AC1, &_bmp085_coeffs.ac1) &&
 		readS16(BMP085_REGISTER_CAL_AC2, &_bmp085_coeffs.ac2) &&
@@ -179,7 +107,6 @@ bool Adafruit_BMP085_Unified::readCoefficients(void)
 		readS16(BMP085_REGISTER_CAL_MB, &_bmp085_coeffs.mb) &&
 		readS16(BMP085_REGISTER_CAL_MC, &_bmp085_coeffs.mc) &&
 		readS16(BMP085_REGISTER_CAL_MD, &_bmp085_coeffs.md);
-#endif
 }
 
 int8_t Adafruit_BMP085_Unified::isDataReady()
@@ -297,9 +224,6 @@ bool Adafruit_BMP085_Unified::readPressure(int32_t *pressure)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
 {
-#if BMP085_USE_DATASHEET_VALS
-	*temperature = 27898;
-#else
 	uint16_t t;
 	if (!requestTemperature())
 	{
@@ -311,7 +235,6 @@ bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
 		return false;
 	}
 	*temperature = t;
-#endif
 	return true;
 }
 
@@ -322,10 +245,6 @@ bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::readRawPressure(int32_t *pressure)
 {
-#if BMP085_USE_DATASHEET_VALS
-	*pressure = 23843;
-#else
-
 	if (!requestPressure())
 	{
 		return false;
@@ -338,7 +257,6 @@ bool Adafruit_BMP085_Unified::readRawPressure(int32_t *pressure)
 	{
 		return false;
 	}
-#endif
 	return true;
 }
 
@@ -437,7 +355,6 @@ bool Adafruit_BMP085_Unified::getPressure(float *pressure)
 	}
 	readyPressure = false;
 
-	int32_t compp = 0;
 	int32_t  x1, x2, b5, b6, x3, b3, p;
 	uint32_t b4, b7;
 
@@ -469,7 +386,7 @@ bool Adafruit_BMP085_Unified::getPressure(float *pressure)
 	x1 = (p >> 8) * (p >> 8);
 	x1 = (x1 * 3038) >> 16;
 	x2 = (-7357 * p) >> 16;
-	compp = p + ((x1 + x2 + 3791) >> 4);
+	int32_t compp = p + ((x1 + x2 + 3791) >> 4);
 
 	/* Assign compensated pressure value */
 	*pressure = compp;
@@ -500,15 +417,6 @@ bool Adafruit_BMP085_Unified::getTemperature(float *temp)
 
 	int32_t B5;
 	float t;
-
-#if BMP085_USE_DATASHEET_VALS
-	// use datasheet numbers!
-	UT = 27898;
-	_bmp085_coeffs.ac6 = 23153;
-	_bmp085_coeffs.ac5 = 32757;
-	_bmp085_coeffs.mc = -8711;
-	_bmp085_coeffs.md = 2868;
-#endif
 
 	B5 = computeB5(UT);
 	t = (B5 + 8) >> 4;
@@ -541,27 +449,6 @@ float Adafruit_BMP085_Unified::pressureToAltitude(float seaLevel, float atmosphe
 
 /**************************************************************************/
 /*!
-	Calculates the altitude (in meters) from the specified atmospheric
-	pressure (in hPa), and sea-level pressure (in hPa).  Note that this
-	function just calls the overload of pressureToAltitude which takes
-	seaLevel and atmospheric pressure--temperature is ignored.  The original
-	implementation of this function was based on calculations from Wikipedia
-	which are not accurate at higher altitudes.  To keep compatibility with
-	old code this function remains with the same interface, but it calls the
-	more accurate calculation.
-
-	@param  seaLevel      Sea-level pressure in hPa
-	@param  atmospheric   Atmospheric pressure in hPa
-	@param  temp          Temperature in degrees Celsius
-*/
-/**************************************************************************/
-float Adafruit_BMP085_Unified::pressureToAltitude(float seaLevel, float atmospheric, float temp)
-{
-	return pressureToAltitude(seaLevel, atmospheric);
-}
-
-/**************************************************************************/
-/*!
 	Calculates the pressure at sea level (in hPa) from the specified altitude
 	(in meters), and atmospheric pressure (in hPa).
 
@@ -579,74 +466,4 @@ float Adafruit_BMP085_Unified::seaLevelForAltitude(float altitude, float atmosph
 	//  http://forums.adafruit.com/viewtopic.php?f=22&t=58064
 
 	return atmospheric / pow(1.0 - (altitude / 44330.0), 5.255);
-}
-
-/**************************************************************************/
-/*!
-	Calculates the pressure at sea level (in hPa) from the specified altitude
-	(in meters), and atmospheric pressure (in hPa).  Note that this
-	function just calls the overload of seaLevelForAltitude which takes
-	altitude and atmospheric pressure--temperature is ignored.  The original
-	implementation of this function was based on calculations from Wikipedia
-	which are not accurate at higher altitudes.  To keep compatibility with
-	old code this function remains with the same interface, but it calls the
-	more accurate calculation.
-
-	@param  altitude      Altitude in meters
-	@param  atmospheric   Atmospheric pressure in hPa
-	@param  temp          Temperature in degrees Celsius
-*/
-/**************************************************************************/
-float Adafruit_BMP085_Unified::seaLevelForAltitude(float altitude, float atmospheric, float temp)
-{
-	return seaLevelForAltitude(altitude, atmospheric);
-}
-
-
-
-/**************************************************************************/
-/*!
-	@brief  Provides the sensor_t data for this sensor
-*/
-/**************************************************************************/
-void Adafruit_BMP085_Unified::getSensor(sensor_t *sensor)
-{
-	/* Clear the sensor_t object */
-	memset(sensor, 0, sizeof(sensor_t));
-
-	/* Insert the sensor name in the fixed length char array */
-	strncpy(sensor->name, "BMP085", sizeof(sensor->name) - 1);
-	sensor->name[sizeof(sensor->name) - 1] = 0;
-	sensor->version = 1;
-	sensor->sensor_id = _sensorID;
-	sensor->type = SENSOR_TYPE_PRESSURE;
-	sensor->min_delay = 0;
-	sensor->max_value = 1100.0F;               // 300..1100 hPa
-	sensor->min_value = 300.0F;
-	sensor->resolution = 0.01F;                // Datasheet states 0.01 hPa resolution
-}
-
-/**************************************************************************/
-/*!
-	@brief  Reads the sensor and returns the data as a sensors_event_t
-*/
-/**************************************************************************/
-bool Adafruit_BMP085_Unified::getEvent(sensors_event_t *event)
-{
-	float pressure_kPa;
-
-	/* Clear the event */
-	memset(event, 0, sizeof(sensors_event_t));
-	if (!getPressure(&pressure_kPa))
-	{
-		return false;
-	}
-
-	event->version = sizeof(sensors_event_t);
-	event->sensor_id = _sensorID;
-	event->type = SENSOR_TYPE_PRESSURE;
-	event->timestamp = 0;
-	event->pressure = pressure_kPa / 100.0F;
-
-	return true;
 }

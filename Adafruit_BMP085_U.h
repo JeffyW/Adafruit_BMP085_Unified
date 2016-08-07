@@ -17,20 +17,8 @@
 #ifndef __BMP085_H__
 #define __BMP085_H__
 
-#if (ARDUINO >= 100)
 #include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
-#include <Adafruit_Sensor.h>
-
-#ifdef __AVR_ATtiny85__
-#include "TinyWireM.h"
-#define Wire TinyWireM
-#else
 #include <Wire.h>
-#endif
 
  /*=========================================================================
 	 I2C ADDRESS/BITS
@@ -105,7 +93,7 @@ typedef struct
 #define DATA_READY_TEMPERATURE 1
 #define DATA_READY_PRESSURE 2
 
-class Adafruit_BMP085_Unified : public Adafruit_Sensor
+class Adafruit_BMP085_Unified
 {
 public:
 	Adafruit_BMP085_Unified(TwoWire* wire, int32_t sensorID = -1);
@@ -116,22 +104,15 @@ public:
 	bool  getPressure(float *pressure);
 	float pressureToAltitude(float seaLevel, float atmospheric);
 	float seaLevelForAltitude(float altitude, float atmospheric);
-	// Note that the next two functions are just for compatibility with old
-	// code that passed the temperature as a third parameter.  A newer
-	// calculation is used which does not need temperature.
-	float pressureToAltitude(float seaLevel, float atmospheric, float temp);
-	float seaLevelForAltitude(float altitude, float atmospheric, float temp);
-	bool  getEvent(sensors_event_t*);
-	void  getSensor(sensor_t*);
 
 	int8_t isDataReady();
 
 private:
 	int32_t computeB5(int32_t ut);
-	bool writeCommand(byte reg, byte value);
-	bool read8(byte reg, uint8_t *value);
-	bool read16(byte reg, uint16_t *value);
-	bool readS16(byte reg, int16_t *value);
+	bool writeCommand(uint8_t reg, uint8_t value);
+	bool read8(uint8_t reg, uint8_t *value);
+	bool read16(uint8_t reg, uint16_t *value);
+	bool readS16(uint8_t reg, int16_t *value);
 	bool readCoefficients(void);
 	bool readRawTemperature(int32_t *temperature);
 	bool readRawPressure(int32_t *pressure);
