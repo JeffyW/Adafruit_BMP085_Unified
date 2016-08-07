@@ -210,17 +210,14 @@ bool Adafruit_BMP085_Unified::readPressure(int32_t *pressure)
 	{
 		return false;
 	}
-	Serial.println(p16);
 	
 	uint8_t p8;
 	if (read8(BMP085_REGISTER_PRESSUREDATA + 2, &p8))
 	{
 		return false;
 	}
-	Serial.println(p8);
 	
 	*pressure = ((uint32_t)p16 << 8 | p8) >> (8 - _bmp085Mode);
-	Serial.println(*pressure);
 	readingPressure = false;
 	readyPressure = true;
 	return true;
