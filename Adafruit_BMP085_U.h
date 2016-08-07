@@ -17,18 +17,17 @@
 #ifndef __BMP085_H__
 #define __BMP085_H__
 
-#include "Arduino.h"
-#include <Wire.h>
+#include <I2C-Master-Library/I2C.h>
 
- /*=========================================================================
-	 I2C ADDRESS/BITS
-	 -----------------------------------------------------------------------*/
+/*=========================================================================
+	I2C ADDRESS/BITS
+	-----------------------------------------------------------------------*/
 #define BMP085_ADDRESS                (0x77)
-	 /*=========================================================================*/
+/*=========================================================================*/
 
-	 /*=========================================================================
-		 REGISTERS
-		 -----------------------------------------------------------------------*/
+/*=========================================================================
+	REGISTERS
+	-----------------------------------------------------------------------*/
 enum
 {
 	BMP085_REGISTER_CAL_AC1 = 0xAA,  // R   Calibration data (16 bits)
@@ -96,12 +95,11 @@ typedef struct
 class Adafruit_BMP085_Unified
 {
 public:
-	Adafruit_BMP085_Unified(TwoWire* wire, int32_t sensorID = -1) :
+	Adafruit_BMP085_Unified(I2C* wire, int32_t sensorID = -1) :
 		_wire(wire),
 		_sensorID(sensorID) {}
-
 	Adafruit_BMP085_Unified(int32_t sensorID = -1) :
-		Adafruit_BMP085_Unified(&Wire, sensorID) {}
+		Adafruit_BMP085_Unified(&I2c, sensorID) {}
 
 	bool  begin(bmp085_mode_t mode = BMP085_MODE_ULTRAHIGHRES);
 	bool  getTemperature(float *temp);
@@ -113,20 +111,20 @@ public:
 
 private:
 	int32_t computeB5(int32_t ut);
-	bool writeCommand(uint8_t reg, uint8_t value);
-	bool read8(uint8_t reg, uint8_t *value);
-	bool read16(uint8_t reg, uint16_t *value);
-	bool readS16(uint8_t reg, int16_t *value);
-	bool readCoefficients(void);
+	uint8_t writeCommand(uint8_t reg, uint8_t value);
+	uint8_t read8(uint8_t reg, uint8_t *value);
+	uint8_t read16(uint8_t reg, uint16_t *value);
+	uint8_t readS16(uint8_t reg, int16_t *value);
+	void readCoefficients(void);
 	bool readRawTemperature(int32_t *temperature);
 	bool readRawPressure(int32_t *pressure);
 
-	bool requestTemperature();
-	bool requestPressure();
+	uint8_t requestTemperature();
+	uint8_t requestPressure();
 	bool readTemperature(uint16_t *temperature);
 	bool readPressure(int32_t *pressure);
 
-	TwoWire* _wire;
+	I2C* _wire;
 	int32_t _sensorID;
 	unsigned long readyStart;
 	unsigned long readyDelay;

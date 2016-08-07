@@ -15,9 +15,8 @@
   BSD license, all text above must be included in any redistribution
  ***************************************************************************/
 #include "Arduino.h"
-#include <Wire.h>
+#include <I2C-Master-Library/I2C.h>
 #include <math.h>
-#include <limits.h>
 #include "Adafruit_BMP085_U.h"
 
 static bmp085_calib_data _bmp085_coeffs;   // Last read accelerometer data will be available here
@@ -32,12 +31,9 @@ static uint8_t           _bmp085Mode;
 	 @brief  Writes an 8 bit value over I2C
  */
  /**************************************************************************/
-bool Adafruit_BMP085_Unified::writeCommand(uint8_t reg, uint8_t value)
+uint8_t Adafruit_BMP085_Unified::writeCommand(uint8_t reg, uint8_t value)
 {
-	_wire->beginTransmission(BMP085_ADDRESS);
-	_wire->write(reg);
-	_wire->write(value);
-	return _wire->endTransmission() == 0;
+	return _wire->write(BMP085_ADDRESS, reg, value);
 }
 
 /**************************************************************************/
@@ -45,15 +41,15 @@ bool Adafruit_BMP085_Unified::writeCommand(uint8_t reg, uint8_t value)
 	@brief  Reads an 8 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::read8(uint8_t reg, uint8_t *value)
+uint8_t Adafruit_BMP085_Unified::read8(uint8_t reg, uint8_t *value)
 {
-	const byte bytesToRead = 1;
-	if (_wire->requestFrom(BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
+	uint8_t returnStatus = _wire->read(BMP085_ADDRESS, reg, 1);
+	if (returnStatus)
 	{
-		return false;
+		return returnStatus;
 	}
-	* value = _wire->read();
-	return true;
+	*value = _wire->receive();
+	return 0;
 }
 
 /**************************************************************************/
@@ -61,15 +57,15 @@ bool Adafruit_BMP085_Unified::read8(uint8_t reg, uint8_t *value)
 	@brief  Reads a 16 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::read16(uint8_t reg, uint16_t *value)
+uint8_t Adafruit_BMP085_Unified::read16(uint8_t reg, uint16_t *value)
 {
-	const byte bytesToRead = 2;
-	if (_wire->requestFrom(BMP085_ADDRESS, bytesToRead, reg, 1, true) != bytesToRead)
+	uint8_t returnStatus = _wire->read(BMP085_ADDRESS, reg, 2);
+	if (returnStatus)
 	{
-		return false;
+		return returnStatus;
 	}
-	* value = (_wire->read() << 8) | _wire->read();
-	return true;
+	*value = ((uint16_t)_wire->receive() << 8) | _wire->receive();
+	return 0;
 }
 
 /**************************************************************************/
@@ -77,15 +73,16 @@ bool Adafruit_BMP085_Unified::read16(uint8_t reg, uint16_t *value)
 	@brief  Reads a signed 16 bit value over I2C
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::readS16(uint8_t reg, int16_t *value)
+uint8_t Adafruit_BMP085_Unified::readS16(uint8_t reg, int16_t *value)
 {
 	uint16_t i;
-	if (!read16(reg, &i))
+	uint8_t returnStatus = read16(reg, &i);
+	if (returnStatus)
 	{
-		return false;
+		return returnStatus;
 	}
 	*value = (int16_t)i;
-	return true;
+	return 0;
 }
 
 /**************************************************************************/
@@ -93,20 +90,19 @@ bool Adafruit_BMP085_Unified::readS16(uint8_t reg, int16_t *value)
 	@brief  Reads the factory-set coefficients
 */
 /**************************************************************************/
-bool Adafruit_BMP085_Unified::readCoefficients(void)
+void Adafruit_BMP085_Unified::readCoefficients(void)
 {
-	return
-		readS16(BMP085_REGISTER_CAL_AC1, &_bmp085_coeffs.ac1) &&
-		readS16(BMP085_REGISTER_CAL_AC2, &_bmp085_coeffs.ac2) &&
-		readS16(BMP085_REGISTER_CAL_AC3, &_bmp085_coeffs.ac3) &&
-		read16(BMP085_REGISTER_CAL_AC4, &_bmp085_coeffs.ac4) &&
-		read16(BMP085_REGISTER_CAL_AC5, &_bmp085_coeffs.ac5) &&
-		read16(BMP085_REGISTER_CAL_AC6, &_bmp085_coeffs.ac6) &&
-		readS16(BMP085_REGISTER_CAL_B1, &_bmp085_coeffs.b1) &&
-		readS16(BMP085_REGISTER_CAL_B2, &_bmp085_coeffs.b2) &&
-		readS16(BMP085_REGISTER_CAL_MB, &_bmp085_coeffs.mb) &&
-		readS16(BMP085_REGISTER_CAL_MC, &_bmp085_coeffs.mc) &&
-		readS16(BMP085_REGISTER_CAL_MD, &_bmp085_coeffs.md);
+	readS16(BMP085_REGISTER_CAL_AC1, &_bmp085_coeffs.ac1);
+	readS16(BMP085_REGISTER_CAL_AC2, &_bmp085_coeffs.ac2);
+	readS16(BMP085_REGISTER_CAL_AC3, &_bmp085_coeffs.ac3);
+	read16(BMP085_REGISTER_CAL_AC4, &_bmp085_coeffs.ac4);
+	read16(BMP085_REGISTER_CAL_AC5, &_bmp085_coeffs.ac5);
+	read16(BMP085_REGISTER_CAL_AC6, &_bmp085_coeffs.ac6);
+	readS16(BMP085_REGISTER_CAL_B1, &_bmp085_coeffs.b1);
+	readS16(BMP085_REGISTER_CAL_B2, &_bmp085_coeffs.b2);
+	readS16(BMP085_REGISTER_CAL_MB, &_bmp085_coeffs.mb);
+	readS16(BMP085_REGISTER_CAL_MC, &_bmp085_coeffs.mc);
+	readS16(BMP085_REGISTER_CAL_MD, &_bmp085_coeffs.md);
 }
 
 int8_t Adafruit_BMP085_Unified::isDataReady()
@@ -121,7 +117,7 @@ int8_t Adafruit_BMP085_Unified::isDataReady()
 				return -1;
 			}
 			// Kick off the pressure reading
-			if (!requestPressure())
+			if (requestPressure())
 			{
 				return -2;
 			}
@@ -138,7 +134,7 @@ int8_t Adafruit_BMP085_Unified::isDataReady()
 				return -3;
 			}
 			// Kick off the temperature reading
-			if (!requestTemperature())
+			if (requestTemperature())
 			{
 				return -4;
 			}
@@ -148,7 +144,7 @@ int8_t Adafruit_BMP085_Unified::isDataReady()
 	else
 	{
 		// We haven't started anything, so initialize
-		if (!requestTemperature())
+		if (requestTemperature())
 		{
 			return -4;
 		}
@@ -157,18 +153,26 @@ int8_t Adafruit_BMP085_Unified::isDataReady()
 	return 0;
 }
 
-bool Adafruit_BMP085_Unified::requestTemperature()
+uint8_t Adafruit_BMP085_Unified::requestTemperature()
 {
-	bool result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READTEMPCMD);
+	uint8_t result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READTEMPCMD);
+	if (result)
+	{
+		return result;
+	}
 	readingTemperature = true;
 	readyStart = micros();
 	readyDelay = TEMPERATURE_READ_DELAY_MICROS;
-	return result;
+	return 0;
 }
 
-bool Adafruit_BMP085_Unified::requestPressure()
+uint8_t Adafruit_BMP085_Unified::requestPressure()
 {
-	bool result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READPRESSURECMD + (_bmp085Mode << 6));
+	uint8_t result = writeCommand(BMP085_REGISTER_CONTROL, BMP085_REGISTER_READPRESSURECMD + (_bmp085Mode << 6));
+	if (result)
+	{
+		return result;
+	}
 	readingPressure = true;
 	readyStart = micros();
 	switch (_bmp085Mode)
@@ -188,12 +192,12 @@ bool Adafruit_BMP085_Unified::requestPressure()
 		break;
 	}
 
-	return result;
+	return 0;
 }
 
 bool Adafruit_BMP085_Unified::readTemperature(uint16_t *temperature)
 {
-	bool result = read16(BMP085_REGISTER_TEMPDATA, temperature);
+	bool result = !read16(BMP085_REGISTER_TEMPDATA, temperature);
 	readingTemperature = false;
 	readyTemperature = true;
 	return result;
@@ -202,16 +206,21 @@ bool Adafruit_BMP085_Unified::readTemperature(uint16_t *temperature)
 bool Adafruit_BMP085_Unified::readPressure(int32_t *pressure)
 {
 	uint16_t p16;
+	if (read16(BMP085_REGISTER_PRESSUREDATA, &p16))
+	{
+		return false;
+	}
+	Serial.println(p16);
+	
 	uint8_t p8;
-	if (!read16(BMP085_REGISTER_PRESSUREDATA, &p16))
+	if (read8(BMP085_REGISTER_PRESSUREDATA + 2, &p8))
 	{
 		return false;
 	}
-	if (!read8(BMP085_REGISTER_PRESSUREDATA + 2, &p8))
-	{
-		return false;
-	}
+	Serial.println(p8);
+	
 	*pressure = ((uint32_t)p16 << 8 | p8) >> (8 - _bmp085Mode);
+	Serial.println(*pressure);
 	readingPressure = false;
 	readyPressure = true;
 	return true;
@@ -225,7 +234,7 @@ bool Adafruit_BMP085_Unified::readPressure(int32_t *pressure)
 bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
 {
 	uint16_t t;
-	if (!requestTemperature())
+	if (requestTemperature())
 	{
 		return false;
 	}
@@ -245,7 +254,7 @@ bool Adafruit_BMP085_Unified::readRawTemperature(int32_t *temperature)
 /**************************************************************************/
 bool Adafruit_BMP085_Unified::readRawPressure(int32_t *pressure)
 {
-	if (!requestPressure())
+	if (requestPressure())
 	{
 		return false;
 	}
