@@ -96,8 +96,12 @@ typedef struct
 class Adafruit_BMP085_Unified
 {
 public:
-	Adafruit_BMP085_Unified(TwoWire* wire, int32_t sensorID = -1);
-	Adafruit_BMP085_Unified(int32_t sensorID = -1);
+	Adafruit_BMP085_Unified(TwoWire* wire, int32_t sensorID = -1) :
+		_wire(wire),
+		_sensorID(sensorID) {}
+
+	Adafruit_BMP085_Unified(int32_t sensorID = -1) :
+		Adafruit_BMP085_Unified(&Wire, sensorID) {}
 
 	bool  begin(bmp085_mode_t mode = BMP085_MODE_ULTRAHIGHRES);
 	bool  getTemperature(float *temp);

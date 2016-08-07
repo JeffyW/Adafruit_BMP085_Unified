@@ -272,28 +272,6 @@ int32_t Adafruit_BMP085_Unified::computeB5(int32_t ut) {
 }
 
 /***************************************************************************
- CONSTRUCTOR
- ***************************************************************************/
-
- /**************************************************************************/
- /*!
-	 @brief  Instantiates a new Adafruit_BMP085_Unified class with the specified I2C wire
- */
- /**************************************************************************/
-Adafruit_BMP085_Unified::Adafruit_BMP085_Unified(TwoWire* wire, int32_t sensorID) {
-	_wire = wire;
-	_sensorID = sensorID;
-}
-
-/**************************************************************************/
-/*!
-@brief  Instantiates a new Adafruit_BMP085_Unified class using the default I2C wire
-*/
-/**************************************************************************/
-Adafruit_BMP085_Unified::Adafruit_BMP085_Unified(int32_t sensorID) : Adafruit_BMP085_Unified(&Wire, sensorID) {
-}
-
-/***************************************************************************
  PUBLIC FUNCTIONS
  ***************************************************************************/
 
