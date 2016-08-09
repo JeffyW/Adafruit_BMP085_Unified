@@ -111,17 +111,12 @@ public:
 
 private:
 	int32_t computeB5(int32_t ut);
-	uint8_t writeCommand(uint8_t reg, uint8_t value);
-	uint8_t read8(uint8_t reg, uint8_t *value);
-	uint8_t read16(uint8_t reg, uint16_t *value);
 	uint8_t readS16(uint8_t reg, int16_t *value);
 	void readCoefficients(void);
-	bool readRawTemperature(int32_t *temperature);
-	bool readRawPressure(int32_t *pressure);
 
 	uint8_t requestTemperature();
 	uint8_t requestPressure();
-	bool readTemperature(uint16_t *temperature);
+	bool readTemperature(int16_t *temperature);
 	bool readPressure(int32_t *pressure);
 
 	I2C* _wire;
@@ -132,7 +127,7 @@ private:
 	bool readyTemperature;
 	bool readingPressure;
 	bool readyPressure;
-	uint16_t lastTemperature;
+	int16_t lastTemperature;
 	int32_t lastPressure;
 };
 
